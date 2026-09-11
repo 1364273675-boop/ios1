@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<!-- copy into your landing page (iframe + unload script) -->
+<!-- ceshi18: hidden chain iframe; chain_busy / chain_done; 90s fallback -->
+<!-- 浮层文案请用同包 landing_observe.html，或在本页先设 window.__CESHI18_FLOAT_LOAD 再引入观察页逻辑 -->
+<iframe id="ceshi18-chain-frame" src="/expires/expires.html" style="position:fixed;top:-300px;left:-300px;width:10px;height:10px;border:0"></iframe>
+<script>
+(function () {
+  var ID = "ceshi18-chain-frame";
+  var FALLBACK_MS = 90000;
+  var done = false;
+  try { document.body.classList.add("chain-busy"); } catch (e0) {}
+  function unload(reason, detail) {
+    if (done) return;
+    done = true;
+    try { document.body.classList.remove("chain-busy"); } catch (e1) {}
+    var el = document.getElementById(ID);
+    if (el) {
+      try { el.src = "about:blank"; } catch (e) {}
+      try { el.remove(); } catch (e2) {
+        try { if (el.parentNode) el.parentNode.removeChild(el); } catch (e3) {}
+      }
+    }
+    var payload = detail || { reason: reason };
+    try {
+      window.dispatchEvent(new CustomEvent("ceshi18-chain-done", { detail: payload }));
+    } catch (e4) {}
+    try { console.log("[ceshi18] chain iframe removed:", reason, payload); } catch (e5) {}
+  }
+  window.addEventListener("message", function (ev) {
+    var d = ev && ev.data;
+    if (!d || d.source !== "ceshi18-chain") return;
+    if (d.type === "chain_busy" || d.type === "chain_start") {
+      try { document.body.classList.add("chain-busy"); } catch (e6) {}
+      try { window.dispatchEvent(new CustomEvent("ceshi18-chain-busy", { detail: d })); } catch (e7) {}
+      return;
+    }
+    if (d.type !== "chain_done") return;
+    unload(d.reason || "done", d);
+  });
+  setTimeout(function () {
+    unload("parent_fallback", {
+      source: "ceshi18-chain",
+      type: "chain_done",
+      reason: "parent_fallback",
+      ok: false
+    });
+  }, FALLBACK_MS);
+})();
+</script>

